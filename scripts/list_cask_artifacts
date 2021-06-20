@@ -1,0 +1,68 @@
+#!/bin/sh
+
+program="$(basename -- "$0")"
+
+usage() {
+  printf "                                        \\n \
+    List cask artifacts.                          \\n \
+                                                  \\n \
+    Usage:                                        \\n \
+      %s [options]                                \\n \
+                                                  \\n \
+    Options:                                      \\n \
+      --app(s)            List only applications  \\n \
+      --font(s)           List only fonts         \\n \
+      --ql, --quicklook   List QuickLook plugins  \\n \
+      --colorpicker       List color pickers      \\n \
+      -h, --help          Show this help          \\n" "$program" \
+    | sed -E 's/^ {4}//'
+}
+
+list_cask_artifacts() {
+  filter="${1:-"/./"}"
+
+  printf "token\tname\tartifact\n"
+  brew list --cask \
+    | awk "$filter" \
+    | xargs -I{} brew info --cask {} --json=v2 \
+    | jq --raw-output --unbuffered \
+      "[                                                             \
+        .casks[0].token,                                             \
+        .casks[0].name[0],                                           \
+        [.casks[0].artifacts[] | arrays, strings][0]                 \
+          | if type == \"array\" then .[0] else split(\" \")[0] end  \
+      ]                                                              \
+        | @tsv"
+}
+
+while [ "$#" -gt 0 ]; do
+  case $1 in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --app | --apps)
+    filter='!/^(font-|colorpicker-|quicklook-|ql)/'
+    invert=1
+    shift
+    ;;
+  --font | --fonts)
+    filter='/^font-/'
+    shift
+    ;;
+  --ql | --quicklook)
+    filter='/^(quicklook-|ql)/'
+    shift
+    ;;
+  --colorpicker)
+    filter='/^colorpicker-/'
+    shift
+    ;;
+  -*)
+    echo "Unrecognised option: $1"
+    exit 1
+    ;;
+  esac
+done
+
+list_cask_artifacts $filter $invert
