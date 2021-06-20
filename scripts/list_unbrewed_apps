@@ -1,0 +1,59 @@
+#!/bin/sh
+
+program="$(basename -- "$0")"
+
+usage() {
+  printf "                         \\n \
+    List unbrewed apps.            \\n \
+                                   \\n \
+    Usage:                         \\n \
+      %s [options]                 \\n \
+                                   \\n \
+    Options:                       \\n \
+      -h, --help   Show this help  \\n" "$program" \
+    | sed -E 's/^ {4}//'
+}
+
+
+list_installed_apps() {
+  find /Applications -name '*.app' -maxdepth 1 -print0 \
+    | xargs -0 -I{} basename -s '.app' -- {} \
+    | tr '[:upper:]' '[:lower:]' \
+    | sed 's/[. _-]//g' \
+    | sort
+}
+
+list_brewed_apps() {
+  brew list --cask \
+    | grep -v '^colorpicker-' \
+    | grep -v '^font-' \
+    | grep -v '^quicklook-' \
+    | sed 's/[. _-]//g'
+}
+
+list_unbrewed_apps() {
+  tmp=$(mktemp -dt brew-disownedXXXXXX)
+  trap 'rm -rf $tmp' EXIT
+
+  brewed_apps="$tmp/brewed"
+  installed_apps="$tmp/all"
+
+  list_brewed_apps >"$brewed_apps"
+  list_installed_apps >"$installed_apps"
+  comm -23 "$installed_apps" "$brewed_apps"
+}
+
+while [ "$#" -gt 0 ]; do
+  case $1 in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  -*)
+    echo "Unrecognised option: $1"
+    exit 1
+    ;;
+  esac
+done
+
+list_unbrewed_apps
