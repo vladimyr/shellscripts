@@ -1,0 +1,21 @@
+#!/bin/sh
+
+set -e
+
+has() {
+  command -v "$1" >/dev/null
+}
+
+if has dog; then
+  dns_query() {
+    dog --short "$1" TXT
+  }
+elif has dig; then
+  dns_query() {
+    dig +noall +answer +short "$1" TXT
+  }
+fi
+
+dns_query "$1" \
+  | xargs -n1 printf '%s\n' \
+  | command grep -i '^security_'
